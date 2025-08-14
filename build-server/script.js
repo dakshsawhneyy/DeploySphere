@@ -2,6 +2,22 @@ const { exec } = require('child_process')   // run shell commands inside javascr
 const path = require('path')    // used to join path
 const fs = require('fs')
 
+const {S3Client, PutObjectCommand} = require('@aws-sdk/client-s3')
+
+const mime = require('mime-types')
+
+// Creating S3 Client -- providing communication things
+const s3Client = new S3Client({
+    region: '',
+    credentials: {
+        accessKeyId: '',
+        secretAccessKey: ''
+    }
+})
+
+// fetching projectID from .env
+const projectID = process.env.projectID
+
 async function init() {
     console.log('Starting build server...')
     const outputDir = path.join(__dirname, 'output')    // join this script folder with output i.e. /home/app -- __dirname and /output
@@ -20,7 +36,7 @@ async function init() {
     })
 
     // Wait for the process to finish
-    p.on('close', () => {
+    p.on('close', async() => {
         console.log('Build Complete')
         
         // Npm run build makes dist/ folder, containing all static files
@@ -31,10 +47,21 @@ async function init() {
         for(const item of distFolderContents){
             if(fs.lstatSync(item).isDirectory()) continue;
 
-            // Uploading to S3
-            
+            // create config to upload to s3
+            const command = new PutObjectCommand({
+                Bucket: '',
+                Key: `__outputs/${projectID}/${item}`,    // The path, file is stored inside s3
+                Body: fs.createReadStream(item),     // it divides file into chunks for uploading large objects easily
+                ContentType: mime.lookup(item)
+            })
+
+            // Start uploading to S3
+            await s3Client.send(command)
+
         }
     })
+    
+    console.log('Done....')
 }
 
 
