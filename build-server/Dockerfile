@@ -1,6 +1,6 @@
 FROM ubuntu:focal
 
-RUN apt get update
+RUN apt-get update
 RUN apt-get install curl -y
 
 # Installing node js
