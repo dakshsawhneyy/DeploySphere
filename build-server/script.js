@@ -1,5 +1,6 @@
 const { exec } = require('child_process')   // run shell commands inside javascript code
 const path = require('path')    // used to join path
+const fs = require('fs')
 
 async function init() {
     console.log('Starting build server...')
@@ -21,6 +22,18 @@ async function init() {
     // Wait for the process to finish
     p.on('close', () => {
         console.log('Build Complete')
+        
+        // Npm run build makes dist/ folder, containing all static files
+        const distFolderPath = path(__dirname, 'output', 'dist')
+        const distFolderContents = fs.readdirSync(distFolderPath, {recursive: true})
+
+        // Loop over all files and send them to s3 (not folder)
+        for(const item of distFolderContents){
+            if(fs.lstatSync(item).isDirectory()) continue;
+
+            // Uploading to S3
+            
+        }
     })
 }
 
