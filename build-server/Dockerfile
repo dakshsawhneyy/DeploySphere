@@ -12,7 +12,8 @@ RUN apt-get install -y nodejs
 RUN apt-get install git -y
 
 # create this location inside container
-WORKDIR /home/app
+# /home/app because we have used ubuntu, and it has path /home/ubuntu
+WORKDIR /home/app   
 
 # copy file inside /home/app/
 COPY main.sh main.sh
