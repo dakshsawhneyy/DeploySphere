@@ -10,6 +10,7 @@
   "description": "",
   "dependencies": {
     "@aws-sdk/client-s3": "^3.864.0",
+    "ioredis": "^5.7.0",
     "mime-types": "^3.0.1"
   }
 }
