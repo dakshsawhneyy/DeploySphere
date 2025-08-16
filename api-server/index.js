@@ -4,15 +4,41 @@ const { ECSClient, RunTaskCommand } = require('@aws-sdk/client-ecs')
  
 require('dotenv').config()
 
+console.log("AWS_ACCESS_KEY_ID:", process.env.AWS_ACCESS_KEY_ID)
+console.log("AWS_SECRET_ACCESS_KEY:", process.env.AWS_SECRET_ACCESS_KEY)
+
+
+const { Server } = require('socket.io')
+const Redis = require('ioredis')
+
 const app = express()
 const PORT = 9000
 
-// Creating a new ECS Client
+// Creating Redis Subscriber
+const subscriber = new Redis(process.env.REDIS_URL, {tls: {}})
+
+// ! Creating Socker Server
+const io = new Server({ cors:'*' })     // Creating new socket server
+
+// Joining Redis Channel for live updates
+io.on('connection', socket => {
+    console.log('Socket connected')
+    // Subscribe to Redis
+    socket.on('subscribe', channel => {
+        socket.join(channel)
+        socket.emit('message', `Joined: ${channel}`)
+    })
+})
+
+io.listen(9002, () => console.log('Socket server listening on port 9002'))
+
+
+// * Creating a new ECS Client
 const ecsClient = new ECSClient({
     region: 'ap-south-1',
     credentials: {
-        accessKeyId: process.env.AccessKeyId,
-        secretAccessKey: process.env.SecretAccessKey
+        accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+        secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY
     }
 })
 
@@ -25,7 +51,7 @@ const config = {
 // we need to make express.json() -- to handle application/json requests
 app.use(express.json())
 
-app.use('/project', async(req,res) => {
+app.post('/project', async(req,res) => {
     const { gitURL } = req.body
     const projectSlug = generateSlug()  // generating unique slug for subdomain
 
@@ -48,7 +74,10 @@ app.use('/project', async(req,res) => {
                 name: 'builder-image',
                 environment: [
                     { name: 'GIT_REPOSITORY__URL', value: gitURL},
-                    { name: 'projectID', value: projectSlug }
+                    { name: 'projectID', value: projectSlug },
+                    { name: 'REDIS_URL', value: process.env.REDIS_URL },
+                    { name: 'AWS_ACCESS_KEY_ID', value: process.env.AWS_ACCESS_KEY_ID },
+                    { name: 'AWS_SECRET_ACCESS_KEY', value: process.env.AWS_SECRET_ACCESS_KEY }
                 ]
             }]
         }
@@ -61,6 +90,18 @@ app.use('/project', async(req,res) => {
     return res.json({ status: 'queued', data: { projectSlug, url: `http://${projectSlug}.localhost:8000` }})
     
 })
+
+// This will subscribe to redis, which will furthur send logs to socket
+function subscribeToRedis() {
+    // Subscribe to Redis Channel
+    console.log('Subscribing to Redis logs channel...')
+    subscriber.psubscribe('logs:*') // p means pattern and subscribe to all logs
+    subscriber.on('pmessage', (pattern, channel, message) => {
+        io.to(channel).emit('message', message)
+    })
+}
+
+subscribeToRedis()
 
 app.listen(PORT, () => {
     console.log(`API Server listening on port: ${PORT}`)
