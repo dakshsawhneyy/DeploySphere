@@ -6,6 +6,8 @@ const {S3Client, PutObjectCommand} = require('@aws-sdk/client-s3')
 
 const mime = require('mime-types')
 
+const Redis = require('ioredis')
+
 // Creating S3 Client -- providing communication things
 const s3Client = new S3Client({
     region: 'ap-south-1',
@@ -17,6 +19,16 @@ const s3Client = new S3Client({
 
 // fetching projectID from .env
 const projectID = process.env.projectID
+
+// Creating Redis Publisher
+const publisher = new Redis(process.env.REDIS_CLUSTER)
+
+// Publish logs to a specific channel
+function publishLog(log){
+    publisher.publish(`Producing Logs for ${projectID}: ${JSON.stringify({log})}`)
+    
+    console.log('Published Log:', log)
+}
 
 async function init() {
     console.log('Starting build server...')
@@ -30,11 +42,13 @@ async function init() {
     console.log('Running command:', `cd ${outputDir} && npm install && npm run build`)
     p.stdout.on('data', (data) => {
         console.log(data.toString())    // it is a buffer, convert to string
+        publishLog(data.toString())
     })
 
     // Produce error as output if any
     p.stdout.on('error', (error) => {
         console.error('Error:', error.toString())    // it is a buffer, convert to string
+        publishLog(`error: ${error.toString()}`)
     })
 
     console.log('Waiting for build to finish...')
@@ -47,12 +61,17 @@ async function init() {
         const distFolderContents = fs.readdirSync(distFolderPath, {recursive: true})
 
         console.log('Contents of dist folder:', distFolderContents)
+
+        publishLog(`Starting to upload`)
+
         // Loop over all files and send them to s3 (not folder)
         for(const item of distFolderContents){
             if(fs.lstatSync(item).isDirectory()) continue;
 
             // create config to upload to s3
             console.log('Processing file:', item)
+            publishLog(`Uploading file: ${item}`)
+
             const command = new PutObjectCommand({
                 Bucket: 'vercel-clone-mega-project',
                 Key: `__outputs/${projectID}/${item}`,    // The path, file is stored inside s3
@@ -65,10 +84,12 @@ async function init() {
             await s3Client.send(command)
             console.log('File uploaded successfully:', item)
 
+            publishLog(`File uploaded successfully: ${item}`)
         }
     })
     
     console.log('Done....')
+    publishLog(`Build server finished processing for project ${projectID}`)
 }
 
 
