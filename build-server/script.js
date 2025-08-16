@@ -12,8 +12,8 @@ const Redis = require('ioredis')
 const s3Client = new S3Client({
     region: 'ap-south-1',
     credentials: {
-        accessKeyId: process.env.AccessKeyId,
-        secretAccessKey: process.env.SecretAccessKey
+        accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+        secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY
     }
 })
 
@@ -21,12 +21,11 @@ const s3Client = new S3Client({
 const projectID = process.env.projectID
 
 // Creating Redis Publisher
-const publisher = new Redis(process.env.REDIS_CLUSTER)
+const publisher = new Redis(process.env.REDIS_URL, {tls: {}})
 
 // Publish logs to a specific channel
 function publishLog(log){
-    publisher.publish(`Producing Logs for ${projectID}: ${JSON.stringify({log})}`)
-    
+    publisher.publish(`logs:${projectID}`, JSON.stringify({log}))   // send logs to logs:PROJECTID
     console.log('Published Log:', log)
 }
 
@@ -46,7 +45,7 @@ async function init() {
     })
 
     // Produce error as output if any
-    p.stdout.on('error', (error) => {
+    p.on('error', (error) => {
         console.error('Error:', error.toString())    // it is a buffer, convert to string
         publishLog(`error: ${error.toString()}`)
     })
@@ -57,7 +56,7 @@ async function init() {
         console.log('Build finished successfully!')
         
         // Npm run build makes dist/ folder, containing all static files
-        const distFolderPath = path(__dirname, 'output', 'dist')
+        const distFolderPath = path.join(__dirname, 'output', 'dist')
         const distFolderContents = fs.readdirSync(distFolderPath, {recursive: true})
 
         console.log('Contents of dist folder:', distFolderContents)
