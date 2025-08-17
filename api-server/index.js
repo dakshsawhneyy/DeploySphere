@@ -94,13 +94,10 @@ app.post('/project', async(req,res) => {
 // This will subscribe to redis, which will furthur send logs to socket
 function subscribeToRedis() {
     // Subscribe to Redis Channel
-    console.log('Subscribing to Redis logs channel...')
-    subscriber.psubscribe('logs:*') // p means pattern and subscribe to all logs starting with logs:
+    console.log('Subscribed to logs....')
+    subscriber.psubscribe('logs:*')
     subscriber.on('pmessage', (pattern, channel, message) => {
-        subscriber.psubscribe('logs:*')
-        subscriber.on('pmessage', (pattern, channel, message) => {
-            io.to(channel).emit('message', message)
-        })
+        io.to(channel).emit('message', message)
     })
 }
 

@@ -7,7 +7,7 @@ const BASE_PATH = 'https://vercel-clone-mega-project.s3.ap-south-1.amazonaws.com
 
 const proxy = httpProxy.createProxy();
 
-// Catch every request
+// Catch every request on port 8000
 app.use((req, res) => {
     const hostname = req.hostname;      // catch full hostname
     const subdomain = hostname.split('.')[0];   // catch starting subdomain
