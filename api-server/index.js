@@ -11,11 +11,12 @@ const app = express()
 const PORT = 9000
 
 // Creating Redis Subscriber
-const subscriber = new Redis({
-    host: process.env.REDIS_HOST,
-    port: process.env.REDIS_PORT,
-    tls: {}
-})
+const subscriber = new Redis(process.env.REDIS_URL)
+
+subscriber.on('connect', () => console.log('Redis subscriber connected!'))
+subscriber.on('ready', () => console.log('Redis subscriber ready!'))
+subscriber.on('error', err => console.error('❌ Redis error:', err))
+subscriber.on('end', () => console.log('❌ Redis connection closed'))
 
 // ! Creating Socker Server
 const io = new Server({ cors:'*' })     // Creating new socket server
@@ -25,7 +26,7 @@ io.on('connection', socket => {
     // Subscribe to Redis
     socket.on('subscribe', channel => {     // if user wants to subscribe, specify the channel and socket will make him join that channel
         socket.join(channel)
-        socket.emit('message', `Joined: ${channel}`)
+        socket.emit('message', `Joined: ${channel}`)    // in events in postman, subscribe to message
     })
     console.log('Socket connected')
 })
@@ -74,7 +75,7 @@ app.post('/project', async(req,res) => {
                 name: 'builder-image',
                 environment: [
                     { name: 'GIT_REPOSITORY__URL', value: gitURL},
-                    { name: 'projectID', value: projectSlug },
+                    { name: 'PROJECT_ID', value: projectSlug },
                     { name: 'REDIS_URL', value: process.env.REDIS_URL },
                     { name: 'AWS_ACCESS_KEY_ID', value: process.env.AWS_ACCESS_KEY_ID },
                     { name: 'AWS_SECRET_ACCESS_KEY', value: process.env.AWS_SECRET_ACCESS_KEY }
@@ -88,7 +89,6 @@ app.post('/project', async(req,res) => {
 
     console.log('Container started successfully!')
     return res.json({ status: 'queued', data: { projectSlug, url: `http://${projectSlug}.localhost:8000` }})
-    
 })
 
 // This will subscribe to redis, which will furthur send logs to socket
@@ -97,7 +97,10 @@ function subscribeToRedis() {
     console.log('Subscribing to Redis logs channel...')
     subscriber.psubscribe('logs:*') // p means pattern and subscribe to all logs starting with logs:
     subscriber.on('pmessage', (pattern, channel, message) => {
-        io.to(channel).emit('message', message)
+        subscriber.psubscribe('logs:*')
+        subscriber.on('pmessage', (pattern, channel, message) => {
+            io.to(channel).emit('message', message)
+        })
     })
 }
 
