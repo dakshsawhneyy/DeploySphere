@@ -6,7 +6,9 @@ const {S3Client, PutObjectCommand} = require('@aws-sdk/client-s3')
 
 const mime = require('mime-types')
 
-const Redis = require('ioredis')
+require('dotenv').config();
+
+const {Redis} = require('ioredis')
 
 // Creating S3 Client -- providing communication things
 const s3Client = new S3Client({
@@ -20,13 +22,17 @@ const s3Client = new S3Client({
 // fetching projectID from .env
 const projectID = process.env.projectID
 
+
 // Creating Redis Publisher
-const publisher = new Redis(process.env.REDIS_URL, {tls: {}})
+const publisher = new Redis({
+    host: process.env.REDIS_HOST,
+    port: process.env.REDIS_PORT,
+    tls: {}
+})
 
 // Publish logs to a specific channel
 function publishLog(log){
     publisher.publish(`logs:${projectID}`, JSON.stringify({log}))   // send logs to logs:PROJECTID
-    console.log('Published Log:', log)
 }
 
 async function init() {
@@ -65,7 +71,10 @@ async function init() {
 
         // Loop over all files and send them to s3 (not folder)
         for(const item of distFolderContents){
-            if(fs.lstatSync(item).isDirectory()) continue;
+            const itemFullPath = path.join(distFolderPath, item)
+            
+            // If there is directory, don't copy it to S3
+            if(fs.lstatSync(itemFullPath).isDirectory()) continue;
 
             // create config to upload to s3
             console.log('Processing file:', item)
@@ -74,7 +83,7 @@ async function init() {
             const command = new PutObjectCommand({
                 Bucket: 'vercel-clone-mega-project',
                 Key: `__outputs/${projectID}/${item}`,    // The path, file is stored inside s3
-                Body: fs.createReadStream(item),     // it divides file into chunks for uploading large objects easily
+                Body: fs.createReadStream(itemFullPath),     // it divides file into chunks for uploading large objects easily
                 ContentType: mime.lookup(item)
             })
 

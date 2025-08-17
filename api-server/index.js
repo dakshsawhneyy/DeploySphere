@@ -4,10 +4,6 @@ const { ECSClient, RunTaskCommand } = require('@aws-sdk/client-ecs')
  
 require('dotenv').config()
 
-console.log("AWS_ACCESS_KEY_ID:", process.env.AWS_ACCESS_KEY_ID)
-console.log("AWS_SECRET_ACCESS_KEY:", process.env.AWS_SECRET_ACCESS_KEY)
-
-
 const { Server } = require('socket.io')
 const Redis = require('ioredis')
 
@@ -15,19 +11,23 @@ const app = express()
 const PORT = 9000
 
 // Creating Redis Subscriber
-const subscriber = new Redis(process.env.REDIS_URL, {tls: {}})
+const subscriber = new Redis({
+    host: process.env.REDIS_HOST,
+    port: process.env.REDIS_PORT,
+    tls: {}
+})
 
 // ! Creating Socker Server
 const io = new Server({ cors:'*' })     // Creating new socket server
 
 // Joining Redis Channel for live updates
 io.on('connection', socket => {
-    console.log('Socket connected')
     // Subscribe to Redis
-    socket.on('subscribe', channel => {
+    socket.on('subscribe', channel => {     // if user wants to subscribe, specify the channel and socket will make him join that channel
         socket.join(channel)
         socket.emit('message', `Joined: ${channel}`)
     })
+    console.log('Socket connected')
 })
 
 io.listen(9002, () => console.log('Socket server listening on port 9002'))
@@ -95,7 +95,7 @@ app.post('/project', async(req,res) => {
 function subscribeToRedis() {
     // Subscribe to Redis Channel
     console.log('Subscribing to Redis logs channel...')
-    subscriber.psubscribe('logs:*') // p means pattern and subscribe to all logs
+    subscriber.psubscribe('logs:*') // p means pattern and subscribe to all logs starting with logs:
     subscriber.on('pmessage', (pattern, channel, message) => {
         io.to(channel).emit('message', message)
     })
