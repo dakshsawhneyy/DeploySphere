@@ -6,7 +6,7 @@ const {S3Client, PutObjectCommand} = require('@aws-sdk/client-s3')
 
 const mime = require('mime-types')
 
-require('dotenv').config();
+// require('dotenv').config();
 
 const {Redis} = require('ioredis')
 
@@ -19,20 +19,22 @@ const s3Client = new S3Client({
     }
 })
 
-// fetching projectID from .env
-const projectID = process.env.projectID
-
+// fetching PROJECT_ID from .env
+const PROJECT_ID = process.env.PROJECT_ID
+console.log('PROJECT_ID from env:', PROJECT_ID);
 
 // Creating Redis Publisher
-const publisher = new Redis({
-    host: process.env.REDIS_HOST,
-    port: process.env.REDIS_PORT,
-    tls: {}
-})
+const publisher = new Redis(process.env.REDIS_URL)
+
+publisher.on("error", err => console.error("Publisher Redis error:", err));
+publisher.on("connect", () => console.log("Publisher connected to Redis"));
+
+// logging publishing for checking
+console.log('Publishing to channel:', `logs:${PROJECT_ID}`);
 
 // Publish logs to a specific channel
 function publishLog(log){
-    publisher.publish(`logs:${projectID}`, JSON.stringify({log}))   // send logs to logs:PROJECTID
+    publisher.publish(`logs:${PROJECT_ID}`, JSON.stringify({log}))   // send logs to logs:PROJECT_ID
 }
 
 async function init() {
@@ -82,7 +84,7 @@ async function init() {
 
             const command = new PutObjectCommand({
                 Bucket: 'vercel-clone-mega-project',
-                Key: `__outputs/${projectID}/${item}`,    // The path, file is stored inside s3
+                Key: `__outputs/${PROJECT_ID}/${item}`,    // The path, file is stored inside s3
                 Body: fs.createReadStream(itemFullPath),     // it divides file into chunks for uploading large objects easily
                 ContentType: mime.lookup(item)
             })
@@ -97,8 +99,9 @@ async function init() {
     })
     
     console.log('Done....')
-    publishLog(`Build server finished processing for project ${projectID}`)
+    publishLog(`Build server finished processing for project ${PROJECT_ID}`)
 }
 
+init()
 
 // All these are running inside Docker Container only
