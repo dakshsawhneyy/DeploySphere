@@ -7,8 +7,16 @@ require('dotenv').config()
 const { Server } = require('socket.io')
 const Redis = require('ioredis')
 
+const { z } = require('zod')
+const { PrismaClient } = require('@prisma/client')
+
+
 const app = express()
 const PORT = 9000
+
+
+// Creating Prisma Client
+const prisma = new PrismaClient({})
 
 // Creating Redis Subscriber
 const subscriber = new Redis(process.env.REDIS_URL)
@@ -53,8 +61,61 @@ const config = {
 app.use(express.json())
 
 app.post('/project', async(req,res) => {
-    const { gitURL } = req.body
+    //const { name, gitURL } = req.body
+    // ! But we need to validate the github link and name. So validating using ZOD
+
+    // schema for validating
+    const schema = z.object({
+        name: z.string(),
+        gitURL: z.string().url()   // zod will validate the URL
+    })
+
+    const safeParseResult = schema.safeParse(req.body);
+
+    if(!safeParseResult) res.status(400).json({ error: 'Invalid data' });
+    const { name, gitURL } = safeParseResult.data;
+    
+    // Creating new project with prisma-client
+    const project = await PrismaClient.project.create({
+        data: {
+            name, 
+            gitURL,
+            subDomain: generateSlug()
+        }
+    })
+
+    return res.json({ status: 'success', data: project })
+})
+
+app.post('/deploy', async(req,res) => {
+    // const { projectId } = req.body // but we need to validate, so we can
+
+    // Validating project ID through zod
+    const schema = z.object({
+        projectId: z.string()
+    })
+
+    const safeParseResult = schema.safeParse(req.body);
+    if(!safeParseResult) return res.status(400).json({ error: 'Invalid data' });
+    const { projectId } = safeParseResult.data;     // Fetch data from zod
+
     const projectSlug = generateSlug()  // generating unique slug for subdomain
+
+    // Retrieve project
+    const project = await prisma.project.findUnique({ where: { id: projectId } })
+    if (!project) { return res.status(404).json({ error: 'Project not found' }) }
+
+    // Check if there is no running deployment
+    const runningDeployment = await prisma.deployment.findFirst({ where: { id: projectId, status: { in: ['QUEUED', 'IN_PROGRESS'] } } })
+    if (runningDeployment) { return res.status(400).json({ error: 'Deployment already in progress' }) }
+
+    // Create new deployment
+    const deployment = await prisma.deployment.create({
+        data: {
+            project: { connect: { id: projectId } },  // connecting to the project
+            status: 'QUEUED',  // setting initial status to QUEUED
+        }
+    })
 
     // Spin the container using API Call
     const command = new RunTaskCommand({
@@ -74,8 +135,9 @@ app.post('/project', async(req,res) => {
             containerOverrides: [{
                 name: 'builder-image',
                 environment: [
-                    { name: 'GIT_REPOSITORY__URL', value: gitURL},
-                    { name: 'PROJECT_ID', value: projectSlug },
+                    { name: 'GIT_REPOSITORY__URL', value: project.gitURL},
+                    { name: 'PROJECT_ID', value: projectId },
+                    { name: 'DEPLOYMENT_ID', value: deployment.id },    // used for logs of deployment
                     { name: 'REDIS_URL', value: process.env.REDIS_URL },
                     { name: 'AWS_ACCESS_KEY_ID', value: process.env.AWS_ACCESS_KEY_ID },
                     { name: 'AWS_SECRET_ACCESS_KEY', value: process.env.AWS_SECRET_ACCESS_KEY }
