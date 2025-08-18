@@ -1,0 +1,41 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Creating enum for deployment status
+enum DeploymentStatus {
+  NOT_STARTED
+  QUEUED
+  IN_PROGRESS
+  READY
+  FAILED
+}
+
+// project model
+model Project {
+  id String @id @default(uuid())  
+  name String 
+  gitURL String @map("git_url")   // we can also write in this way
+  subDomain String @map("subdomain")
+  customDomain String?  @map("custom_domain")   // ? means it is optional
+  deployments Deployment[] // opposite relation field
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Deployment {
+  id String @id @default(uuid())  
+  project Project @relation(fields: [projectId], references: [id])  // foreign relation
+  projectId String
+  status DeploymentStatus @default(NOT_STARTED)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}  
