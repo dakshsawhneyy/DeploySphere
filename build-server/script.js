@@ -8,7 +8,8 @@ const mime = require('mime-types')
 
 // require('dotenv').config();
 
-const {Redis} = require('ioredis')
+// const {Redis} = require('ioredis')
+const { Kafka } = require('kafkajs')
 
 // Creating S3 Client -- providing communication things
 const s3Client = new S3Client({
@@ -25,21 +26,43 @@ const DEPLOYMENT_ID = process.env.DEPLOYMENT_ID
 console.log('PROJECT_ID from env:', PROJECT_ID);
 console.log('DEPLOYMENT_ID from env:', DEPLOYMENT_ID);
 
-// Creating Redis Publisher
-const publisher = new Redis(process.env.REDIS_URL)
+// Creating Kafka Instance
+const kafka = new Kafka({
+    brokers: [process.env.KAFKA_BROKER],
+    clientId: `build-server-${DEPLOYMENT_ID}`,   // one project can have multiple deployments
+    ssl: {
+        ca: [fs.readFileSync(path.join(__dirname, kafka.pem), 'utf-8')]
+    },
+    sasl: {
+        username: process.env.KAFKA_USERNAME,
+        password: process.env.KAFKA_PASSWORD,
+        mechanism: 'plain'
+    }
+})
 
-publisher.on("error", err => console.error("Publisher Redis error:", err));
-publisher.on("connect", () => console.log("Publisher connected to Redis"));
+// * Creating Kafka Producer
+const producer = kafka.producer();
+
+// Creating Redis Publisher
+// const publisher = new Redis(process.env.REDIS_URL)
+
+// publisher.on("error", err => console.error("Publisher Redis error:", err));
+// publisher.on("connect", () => console.log("Publisher connected to Redis"));
 
 // logging publishing for checking
 console.log('Publishing to channel:', `logs:${PROJECT_ID}`);
 
 // Publish logs to a specific channel
-function publishLog(log){
-    publisher.publish(`logs:${PROJECT_ID}`, JSON.stringify({log}))   // send logs to logs:PROJECT_ID
+async function publishLog(log){
+    // publisher.publish(`logs:${PROJECT_ID}`, JSON.stringify({log}))   // send logs to logs:PROJECT_ID
+    await producer.send({ topic:`container-logs`, messages: [{ key: 'log', value: JSON.stringify({ PROJECT_ID, DEPLOYMENT_ID, log }) }] })
 }
 
 async function init() {
+
+    // Connect to kafka producer
+    await producer.connect();
+
     console.log('Starting build server...')
     const outputDir = path.join(__dirname, 'output')    // join this script folder with output i.e. /home/app -- __dirname and /output
 
@@ -49,15 +72,15 @@ async function init() {
 
     // Produce all logs as output
     console.log('Running command:', `cd ${outputDir} && npm install && npm run build`)
-    p.stdout.on('data', (data) => {
+    p.stdout.on('data', async(data) => {
         console.log(data.toString())    // it is a buffer, convert to string
-        publishLog(data.toString())
+        await publishLog(data.toString())
     })
 
     // Produce error as output if any
-    p.on('error', (error) => {
+    p.on('error', async(error) => {
         console.error('Error:', error.toString())    // it is a buffer, convert to string
-        publishLog(`error: ${error.toString()}`)
+        await publishLog(`error: ${error.toString()}`)
     })
 
     console.log('Waiting for build to finish...')
@@ -71,7 +94,7 @@ async function init() {
 
         console.log('Contents of dist folder:', distFolderContents)
 
-        publishLog(`Starting to upload`)
+        await publishLog(`Starting to upload`)
 
         // Loop over all files and send them to s3 (not folder)
         for(const item of distFolderContents){
@@ -82,7 +105,7 @@ async function init() {
 
             // create config to upload to s3
             console.log('Processing file:', item)
-            publishLog(`Uploading file: ${item}`)
+            await publishLog(`Uploading file: ${item}`)
 
             const command = new PutObjectCommand({
                 Bucket: 'vercel-clone-mega-project',
@@ -96,12 +119,12 @@ async function init() {
             await s3Client.send(command)
             console.log('File uploaded successfully:', item)
 
-            publishLog(`File uploaded successfully: ${item}`)
+            await publishLog(`File uploaded successfully: ${item}`)
         }
     })
     
     console.log('Done....')
-    publishLog(`Build server finished processing for project ${PROJECT_ID}`)
+    await publishLog(`Build server finished processing for project ${PROJECT_ID}`)
     process.exit(0)  // stop containers after completing the task
 }
 
