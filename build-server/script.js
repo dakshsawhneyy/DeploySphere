@@ -21,7 +21,9 @@ const s3Client = new S3Client({
 
 // fetching PROJECT_ID from .env
 const PROJECT_ID = process.env.PROJECT_ID
+const DEPLOYMENT_ID = process.env.DEPLOYMENT_ID
 console.log('PROJECT_ID from env:', PROJECT_ID);
+console.log('DEPLOYMENT_ID from env:', DEPLOYMENT_ID);
 
 // Creating Redis Publisher
 const publisher = new Redis(process.env.REDIS_URL)
@@ -100,6 +102,7 @@ async function init() {
     
     console.log('Done....')
     publishLog(`Build server finished processing for project ${PROJECT_ID}`)
+    process.exit(0)  // stop containers after completing the task
 }
 
 init()

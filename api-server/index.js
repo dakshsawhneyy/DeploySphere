@@ -7,7 +7,7 @@ require('dotenv').config()
 const { Server } = require('socket.io')
 const Redis = require('ioredis')
 
-const { z } = require('zod')
+const { z } = require('zod')    // Powerful Library for validation
 const { PrismaClient } = require('@prisma/client')
 
 
@@ -67,7 +67,7 @@ app.post('/project', async(req,res) => {
     // schema for validating
     const schema = z.object({
         name: z.string(),
-        gitURL: z.string().url()   // zod will validate the URL
+        gitURL: z.string()   // zod will validate the URL
     })
 
     const safeParseResult = schema.safeParse(req.body);
