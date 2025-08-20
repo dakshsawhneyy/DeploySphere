@@ -13,13 +13,16 @@
     "@clickhouse/client": "^1.12.1",
     "@prisma/client": "^6.14.0",
     "@upstash/redis": "^1.35.3",
+    "cors": "^2.8.5",
     "dotenv": "^17.2.1",
     "express": "^5.1.0",
     "ioredis": "^5.7.0",
+    "kafkajs": "^2.2.4",
     "prisma": "^6.14.0",
     "random-word-slugs": "^0.1.7",
     "socket": "^1.0.90",
     "socket.io": "^4.8.1",
+    "uuid": "^11.1.0",
     "zod": "^4.0.17"
   }
 }
