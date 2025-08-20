@@ -20,6 +20,7 @@ COPY main.sh main.sh
 COPY script.js script.js
 COPY package*.json ./
 COPY kafka.pem kafka.pem
+COPY .env .env
 
 # Install all dependencies
 RUN npm install
