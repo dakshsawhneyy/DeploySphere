@@ -6,7 +6,7 @@ const {S3Client, PutObjectCommand} = require('@aws-sdk/client-s3')
 
 const mime = require('mime-types')
 
-// require('dotenv').config();
+require('dotenv').config();
 
 // const {Redis} = require('ioredis')
 const { Kafka } = require('kafkajs')
@@ -23,15 +23,14 @@ const s3Client = new S3Client({
 // fetching PROJECT_ID from .env
 const PROJECT_ID = process.env.PROJECT_ID
 const DEPLOYMENT_ID = process.env.DEPLOYMENT_ID
-console.log('PROJECT_ID from env:', PROJECT_ID);
-console.log('DEPLOYMENT_ID from env:', DEPLOYMENT_ID);
+const subDomain = process.env.subDomain
 
 // Creating Kafka Instance
 const kafka = new Kafka({
     brokers: [process.env.KAFKA_BROKER],
     clientId: `build-server-${DEPLOYMENT_ID}`,   // one project can have multiple deployments
     ssl: {
-        ca: [fs.readFileSync(path.join(__dirname, kafka.pem), 'utf-8')]
+        ca: [fs.readFileSync(path.join(__dirname, 'kafka.pem'), 'utf-8')]
     },
     sasl: {
         username: process.env.KAFKA_USERNAME,
@@ -50,7 +49,7 @@ const producer = kafka.producer();
 // publisher.on("connect", () => console.log("Publisher connected to Redis"));
 
 // logging publishing for checking
-console.log('Publishing to channel:', `logs:${PROJECT_ID}`);
+// console.log('Publishing to channel:', `logs:${PROJECT_ID}`);
 
 // Publish logs to a specific channel
 async function publishLog(log){
@@ -121,11 +120,12 @@ async function init() {
 
             await publishLog(`File uploaded successfully: ${item}`)
         }
+        
+        await publishLog(`Build server finished processing for project ${PROJECT_ID}`)
+        // process.exit(0)  // stop containers after completing the task
     })
     
     console.log('Done....')
-    await publishLog(`Build server finished processing for project ${PROJECT_ID}`)
-    process.exit(0)  // stop containers after completing the task
 }
 
 init()
