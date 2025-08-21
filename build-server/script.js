@@ -54,7 +54,7 @@ const producer = kafka.producer();
 // Publish logs to a specific channel
 async function publishLog(log){
     // publisher.publish(`logs:${PROJECT_ID}`, JSON.stringify({log}))   // send logs to logs:PROJECT_ID
-    await producer.send({ topic:`container-logs`, messages: [{ key: 'log', value: JSON.stringify({ PROJECT_ID, DEPLOYMENT_ID, log }) }] })
+    await producer.send({ topic:`container-logs`, messages: [{ key: 'log', value: JSON.stringify({ PROJECT_ID, DEPLOYMENT_ID, log, subDomain }) }] })
 }
 
 async function init() {
@@ -108,7 +108,7 @@ async function init() {
 
             const command = new PutObjectCommand({
                 Bucket: 'vercel-clone-mega-project',
-                Key: `__outputs/${PROJECT_ID}/${item}`,    // The path, file is stored inside s3
+                Key: `__outputs/${subDomain}/${item}`,    // The path, file is stored inside s3
                 Body: fs.createReadStream(itemFullPath),     // it divides file into chunks for uploading large objects easily
                 ContentType: mime.lookup(item)
             })
@@ -122,7 +122,13 @@ async function init() {
         }
         
         await publishLog(`Build server finished processing for project ${PROJECT_ID}`)
-        // process.exit(0)  // stop containers after completing the task
+        console.log('✅ All files uploaded. Exiting container now.')
+
+        // Closing Kafka Connection
+        await producer.disconnect();
+
+        // Exiting Container
+        process.exit(0)  // stop containers after completing the task
     })
     
     console.log('Done....')
