@@ -124,6 +124,24 @@ app.post('/project', async(req,res) => {
     return res.json({ status: 'success', data: project })
 })
 
+// ! Route for fetching all projects
+app.get('/project/:id', async(req,res) => {
+    const id = req.params.id;
+
+    try {
+        // fetching project from prisma
+        const project = await prisma.project.findUnique({
+            where: {id: id}
+        })
+
+        if (!project) { return res.status(404).json({ error: 'Project not found' }) }
+
+        return res.json({ status: 'success', data: project })
+    } catch (error) {
+        console.error('Error fetching project:', error)
+    }
+    
+})
 
 // ! Route for deploying project by taking projectID in req.body
 app.post('/deploy', async(req,res) => {
