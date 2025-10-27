@@ -24,7 +24,7 @@ DeploySphere is built on an event-driven, fault-tolerant architecture designed f
 <img width="1773" height="885" alt="image" src="https://github.com/user-attachments/assets/403d1a59-d4c0-4e6f-a6e0-03f3af1e4b5e" />
 * **Dynamic Routing & Subdomains:** Features a **Custom Reverse Proxy** (built with NodeJS/Express) that dynamically routes traffic to live user deployments and assigns unique subdomains.
 <img width="1657" height="1204" alt="image" src="https://github.com/user-attachments/assets/84eaec51-8c44-45d4-a80f-3141969dc00b" />
-* **Event-Driven & Asynchronous Processing:** The entire build and deployment process is designed around asynchronous workflows and event-driven principles, allowing for high concurrency and fault tolerance.
+**Event-Driven & Asynchronous Processing:** The entire build and deployment process is designed around asynchronous workflows and event-driven principles, allowing for high concurrency and fault tolerance.
 
 ---
 ## Technology Stack
